@@ -1,2 +1,4 @@
 *.pyc
 *.Mjpeg
+.idea
+__pycache__
