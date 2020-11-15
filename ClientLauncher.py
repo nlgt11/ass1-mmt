@@ -14,7 +14,6 @@ if __name__ == "__main__":
     root = Tk()
     
     # Create a new client
-    # app = Client(root, serverAddr, serverPort, rtpPort, fileName)
-    app = Client(root, "localhost", "8080", "16385", "movie.Mjpeg")
+    app = Client(root, serverAddr, serverPort, rtpPort, fileName)
     app.master.title("RTPClient")	
     root.mainloop()
