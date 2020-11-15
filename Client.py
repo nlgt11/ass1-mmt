@@ -24,6 +24,7 @@ class Client:
 	PLAY = 'PLAY'
 	PAUSE = 'PAUSE'
 	TEARDOWN = 'TEARDOWN'
+	DESCRIBE = 'DESCRIBE'
 
 	INIT = 0
 	READY = 1
@@ -87,10 +88,16 @@ class Client:
 		self.teardown["command"] = self.tearDown
 		self.teardown.grid(row=1, column=3, padx=2, pady=2)
 
+		# Create Describe button
+		self.describe = Button(self.master, width=20, padx=3, pady=3)
+		self.describe["text"] = "Describe"
+		self.describe["command"] = self.describeReq
+		self.describe.grid(row=1, column=4, padx=2, pady=2)
+
 		# Create a label to display the movie
 		self.label = Label(self.master, height=19)
-		self.label.grid(row=0, column=0, columnspan=4,
-						sticky=W+E+N+S, padx=5, pady=5)
+		self.label.grid(row=0, column=0, columnspan=5,
+						sticky=W+E+N+S, padx=20, pady=5)
         
 		# Statistics
 		self.rcv = 0
@@ -109,26 +116,31 @@ class Client:
 		self.label_loss.grid(row=2, column=2, columnspan=1)
 
 		self.totalRcvBytes = 0
+		self.totalRcvBytesStr = StringVar()
+		self.label_totalRcvBytes = Label(self.master, height=1, textvariable=self.totalRcvBytesStr)
+		self.label_totalRcvBytes.grid(row=2, column=3, columnspan=1)
+
+		self.totalRcvBytes = 0
 		self.dataRate = 0
 		self.totalTime = 0
 		self.startTime = 0
 		self.accumTime = 0
 		self.dataRateStr = StringVar()
 		self.label_data = Label(self.master, height=1, textvariable=self.dataRateStr)
-		self.label_data.grid(row=2, column=3, columnspan=1)
+		self.label_data.grid(row=2, column=4, columnspan=1)
 
 		self.updateText()
 	def updateText(self):
 			self.rcvStr.set("Recieved packet: " + str(self.rcv))
 			self.pckLostStr.set("Packets lost: " + str(self.pckLost))
 			self.lossRateStr.set("Loss rate: {:0.2f} %".format(self.lossRate * 100))
+			self.totalRcvBytesStr.set("Totol recieved data: " + str(self.totalRcvBytes) + " bytes")
 			self.dataRateStr.set("Data rate: {:0.4f} bytes/s".format(self.dataRate))
 
 
 
 	def handler(self):
 		"""Handler on explicitly closing the GUI window."""
-
 		self.pauseMovie()
 		if tkMessageBox.askokcancel("Quit?", "Are you sure you want to quit?"):
 			self.tearDown()
@@ -167,8 +179,7 @@ class Client:
 
 	def playMovie(self):
 		"""Play button handler."""
-		print("I AM HERE")
-		print(self.state)
+
 		if self.state == self.READY:
 			# Create a new thread to listen for RTP packets
 			threading.Thread(target=self.listenRtp).start()
@@ -181,6 +192,13 @@ class Client:
 
 		if self.state == self.PLAYING:
 			self.sendRtspRequest(self.PAUSE)
+
+
+	def describeReq(self):
+		"""Describe button handler."""
+		self.sendRtspRequest(self.DESCRIBE)
+
+
 
 	def listenRtp(self):
 		"Listen for RTP packages"
@@ -197,8 +215,6 @@ class Client:
 					print("===================================")
 					print("Client Frame Num: " + str(self.frameNbr))
 					print("Server Response Frame Num: " + str(currFrameNbr))
-					
-
 
 					if currFrameNbr > self.frameNbr:  # Discard the late packet
 						# Calculate and update Statistics, late packet counted as lost
@@ -267,16 +283,15 @@ class Client:
 	def ProcessRtspReply(self, data):
 		"""Process the RTSP reply from the server."""
 		lines = data.decode().split('\n')
-		print(lines)
 		status = int(lines[0].split()[1])
 		seqNum = int(lines[1].split()[1])
-
-		print(status, seqNum)
-		print(self.rtspSeq)
-		print((seqNum == self.rtspSeq) and (status == 200))
+		print("===================================")
+		print("RTSP from server")
+		print(lines)
+		
 		if (seqNum == self.rtspSeq) and (status == 200):
 			# Set up request, when current ID is 0
-			print("Processing rely")
+			print("Processing reply")
 			if self.sessionID == 0:
 				self.sessionID = int(lines[2].split()[1])
 				self.state = self.READY
@@ -298,6 +313,9 @@ class Client:
 					self.state = self.READY
 					self.accumTime = self.totalTime
 					self.playEvent.set()
+
+				if self.sentRequest == self.DESCRIBE:
+					print(data.decode())
 	
 	def openRtpPort(self):
 		"""Open RTP socket binded to a specified port."""
