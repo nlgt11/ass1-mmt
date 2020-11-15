@@ -123,6 +123,7 @@ class ServerWorker:
 					address = self.clientInfo['rtspSocket'][1][0]
 					port = int(self.clientInfo['rtpPort'])
 					self.clientInfo['rtpSocket'].sendto(self.makeRtp(data, frameNumber),(address,port))
+					print("Sent Frame number: " + str(frameNumber))
 				except:
 					print("Connection Error")
 					#print('-'*60)

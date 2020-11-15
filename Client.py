@@ -7,6 +7,7 @@ import socket
 from PIL import ImageTk
 import PIL.Image
 
+from time import time
 
 from tkinter import *
 import tkinter.messagebox
@@ -90,6 +91,40 @@ class Client:
 		self.label = Label(self.master, height=19)
 		self.label.grid(row=0, column=0, columnspan=4,
 						sticky=W+E+N+S, padx=5, pady=5)
+        
+		# Statistics
+		self.rcv = 0
+		self.rcvStr = StringVar()
+		self.label_data = Label(self.master, height=1, textvariable=self.rcvStr)
+		self.label_data.grid(row=2, column=0, columnspan=1)
+
+		self.pckLost = 0
+		self.pckLostStr = StringVar()
+		self.label_pckLost = Label(self.master, height=1, textvariable=self.pckLostStr)
+		self.label_pckLost.grid(row=2, column=1, columnspan=1)
+
+		self.lossRate = 0
+		self.lossRateStr = StringVar()
+		self.label_loss = Label(self.master, height=1, textvariable=self.lossRateStr)
+		self.label_loss.grid(row=2, column=2, columnspan=1)
+
+		self.totalRcvBytes = 0
+		self.dataRate = 0
+		self.totalTime = 0
+		self.startTime = 0
+		self.accumTime = 0
+		self.dataRateStr = StringVar()
+		self.label_data = Label(self.master, height=1, textvariable=self.dataRateStr)
+		self.label_data.grid(row=2, column=3, columnspan=1)
+
+		self.updateText()
+	def updateText(self):
+			self.rcvStr.set("Recieved packet: " + str(self.rcv))
+			self.pckLostStr.set("Packets lost: " + str(self.pckLost))
+			self.lossRateStr.set("Loss rate: {:0.2f} %".format(self.lossRate * 100))
+			self.dataRateStr.set("Data rate: {:0.4f} bytes/s".format(self.dataRate))
+
+
 
 	def handler(self):
 		"""Handler on explicitly closing the GUI window."""
@@ -157,11 +192,28 @@ class Client:
 				if data:
 					rtpPacket = RtpPacket()
 					rtpPacket.decode(data)
-					currFrameNbr = rtpPacket.seqNum()
+					currFrameNbr = rtpPacket.seqNum() #Server response seq num
+					
+					print("===================================")
+					print("Client Frame Num: " + str(self.frameNbr))
+					print("Server Response Frame Num: " + str(currFrameNbr))
+					
 
-					print("Current Frame Num: " + str(currFrameNbr))
 
 					if currFrameNbr > self.frameNbr:  # Discard the late packet
+						# Calculate and update Statistics, late packet counted as lost
+						self.pckLost += currFrameNbr - self.frameNbr - 1
+						self.rcv += 1
+						self.lossRate = self.pckLost / (self.pckLost + self.rcv)
+						self.totalRcvBytes += sys.getsizeof(rtpPacket.getPayload())
+						print("Total rcv {}".format(self.totalRcvBytes))
+						print("Payload: {}".format(sys.getsizeof(rtpPacket.getPayload())))
+						self.totalTime = int(time()) - self.startTime + self.accumTime
+						print("Time {}".format(self.totalTime))
+						self.dataRate = (self.totalRcvBytes / self.totalTime) if self.totalTime != 0 else 0
+
+						self.updateText()
+
 						self.frameNbr = currFrameNbr
 						self.updateMovie(self.writeFrame(
 							rtpPacket.getPayload()))
@@ -240,9 +292,11 @@ class Client:
 
 				if self.sentRequest == self.PLAY:
 					self.state = self.PLAYING
+					self.startTime = int(time())
 
 				if self.sentRequest == self.PAUSE:
 					self.state = self.READY
+					self.accumTime = self.totalTime
 					self.playEvent.set()
 	
 	def openRtpPort(self):
